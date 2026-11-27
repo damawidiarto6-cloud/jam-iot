@@ -1,0 +1,111 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHTesp.h>
+
+// Pengaturan pin
+#define DHT_PIN 15
+#define LDR_PIN 14
+#define BUTTON_PIN 27
+#define LED_PIN 25
+#define BUZZER_PIN 26
+
+// Membuat objek
+DHTesp dht;
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Variabel
+int ldr;
+int halaman = 0;
+int tombolSebelumnya = HIGH;
+
+void setup() {
+  Serial.begin(115200);
+
+  dht.setup(DHT_PIN, DHTesp::DHT22);
+
+  pinMode(LDR_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("SMART ROOM");
+  lcd.setCursor(0, 1);
+  lcd.print("AUTOMATION");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+
+  // Membaca sensor DHT22
+  TempAndHumidity data = dht.getTempAndHumidity();
+
+  float suhu = data.temperature;
+  float lembap = data.humidity;
+
+  // Membaca sensor LDR
+  ldr = analogRead(LDR_PIN);
+
+  // Menentukan kondisi cahaya
+  bool gelap = ldr < 2000;
+
+  // LED otomatis
+  digitalWrite(LED_PIN, gelap ? HIGH : LOW);
+
+  // Buzzer otomatis
+  if (!isnan(suhu) && suhu >= 20) {
+    tone(BUZZER_PIN, 1000);
+  } else {
+    noTone(BUZZER_PIN);
+  }
+
+  // Membaca tombol
+  int tombol = digitalRead(BUTTON_PIN);
+
+  if (tombol == LOW && tombolSebelumnya == HIGH) {
+    halaman = !halaman;
+    lcd.clear();
+    delay(200);
+  }
+
+  tombolSebelumnya = tombol;
+
+  // Tampilan LCD
+  if (halaman == 0) {
+    lcd.setCursor(0, 0);
+
+    if (isnan(suhu) || isnan(lembap)) {
+      lcd.print("Sensor Error    ");
+    } else {
+      lcd.print("Suhu:");
+      lcd.print(suhu, 1);
+      lcd.print(" C     ");
+    }
+
+    lcd.setCursor(0, 1);
+    lcd.print("Lembap:");
+    lcd.print(lembap, 0);
+    lcd.print("%    ");
+
+  } else {
+    lcd.setCursor(0, 0);
+    lcd.print("Cahaya:");
+
+    if (gelap) {
+      lcd.print("GELAP   ");
+    } else {
+      lcd.print("TERANG  ");
+    }
+
+    lcd.setCursor(0, 1);
+    lcd.print("Nilai LDR:");
+    lcd.print(ldr);
+    lcd.print("  ");
+  }
+
+  delay(300);
+}
